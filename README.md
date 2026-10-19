@@ -7,15 +7,7 @@ An API-first service for storing, searching and exporting translations.
 - **Translations** are tagged by context (`mobile`, `web`, …) and searchable by key, content or tags.
 - **The JSON export** for frontend i18n is always fresh, served pre-compressed from a versioned cache, and answers `304` without touching the database.
 
-|                       |                                                                                                                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Scale tested**      | 50,000 keys × 4 locales = **200,000 translations**                                                                                                                       |
-| **CRUD / search p95** | **27–176 ms** at **50** concurrent connections on a 4-core laptop (budget 200 ms); one scenario, `tagsMode=all`, is borderline (see §6)                                  |
-| **Export**            | cold **≤ 320 ms** (budget 500 ms) · `304` **29 ms** p95 at 50 connections                                                                                                |
-| **Tests**             | 413 unit + e2e tests against real Postgres/Redis · coverage **98.7% statements / 92.8% branches**                                                                        |
-| **Docs**              | Swagger UI at `/docs`, static [`docs/openapi.json`](docs/openapi.json), architecture decision record at [`docs/adr/0001-architecture.md`](docs/adr/0001-architecture.md) |
 
----
 
 ## 1. Quick start
 
@@ -470,13 +462,3 @@ Every variable is validated at startup by [`src/config/app-config.ts`](src/confi
 | `CORS_ORIGINS`                                                         | none                     | Comma-separated allowlist                                                                                                   |
 
 ---
-
-## 9. Next steps for production
-
-- **Read replicas:** route `TranslationQueryRepository` to a replica pool. Writes, and the post-commit version bump, stay on the primary. Replica lag needs care on the export path: a cold build tagged with the new version could read a pre-write snapshot and cache it under that version. Either wait until the replica has replayed the commit's LSN before bumping, or keep cold export builds on the primary. They run once per version, so they are cheap.
-- **PgBouncer** in transaction mode in front of Postgres. The app keeps no session state, so it already fits.
-- **Horizontal scaling:** the app is stateless. Rate limits, the catalog version, the export cache and the build locks are all in Redis, and the in-process LRU needs no coordination. Run N replicas behind a load balancer.
-- **Partitioning:** hash-partition `translations` by `translation_key_id`, or list-partition it by `locale_id`, once it reaches tens of millions of rows. The export already filters by locale, so partition pruning would apply.
-- **OpenTelemetry:** traces for HTTP → service → Kysely → Redis, plus metrics such as export cache hit ratio, build duration, and bump failures. Pino already provides request-scoped ids.
-- **A dedicated search engine** (OpenSearch or Meilisearch) for fuzzy, typo-tolerant, multilingual search at much larger scale, fed by the same post-commit change feed that drives CDN purges.
-- **Durable side effects:** move CDN purges and warming from in-process background tasks to a queue (BullMQ or SQS) with retries, so that a crash right after a commit cannot drop a purge.
