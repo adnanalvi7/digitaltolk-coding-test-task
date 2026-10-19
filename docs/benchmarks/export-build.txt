@@ -1,0 +1,20 @@
+﻿
+> translation-management-service@1.0.0 perf:export-build
+> ts-node --transpile-only test/perf/export-build-bench.ts
+
+
+Dataset: 50001 entries for "en", flat JSON 3.23 MB
+
+A1  query rows (Kysely, SELECT key, value ... ORDER BY key) median   122.1 ms   (min 100.6, max 167.4)
+A2  render flat JSON in JS (cooperative)                   median    22.9 ms   (min 18.2, max 42.8)
+A2b render nested JSON in JS (cooperative)                 median    77.4 ms   (min 64.6, max 86.1)
+B   json_object_agg in Postgres (returns one text value)   median   118.5 ms   (min 111.4, max 182.7)
+C1  gzip level 4 (used)                                    median    38.8 ms   (min 36.0, max 50.0)
+C2  gzip level 6                                           median    77.6 ms   (min 73.1, max 86.9)
+C3  gzip level 1                                           median    20.4 ms   (min 19.5, max 28.1)
+C4  brotli quality 4                                       median    48.4 ms   (min 41.6, max 64.7)
+gzip-4 size: 596 kB (18.5% of raw)
+gzip-6 size: 565 kB (17.5% of raw)
+
+Strategy A total (query + render + gzip-4): 183.9 ms
+Strategy B total (aggregate + gzip-4):     157.3 ms

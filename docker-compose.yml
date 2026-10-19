@@ -1,0 +1,116 @@
+# One command brings up the whole stack: `docker compose up -d`
+#   postgres + redis (healthchecked) -> one-shot migrate -> app (healthchecked)
+# Seed 200k translations + the admin user (credentials come from your env):
+#   ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='choose-a-long-one' \
+#     docker compose --profile seed run --rm seed
+
+x-app-env: &app-env
+  NODE_ENV: production
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  APP_WORKERS: ${APP_WORKERS:-2}
+  # Swagger UI is off by default in production; this demo stack opts in explicitly.
+  SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+  DATABASE_URL: postgres://${POSTGRES_USER:-translations}:${POSTGRES_PASSWORD:-translations}@postgres:5432/${POSTGRES_DB:-translations}
+  REDIS_URL: redis://redis:6379/0
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+  THROTTLE_AUTH_LIMIT: ${THROTTLE_AUTH_LIMIT:-5}
+  THROTTLE_API_LIMIT: ${THROTTLE_API_LIMIT:-120}
+  THROTTLE_EXPORT_LIMIT: ${THROTTLE_EXPORT_LIMIT:-600}
+  THROTTLE_AUTH_FAILURE_LIMIT: ${THROTTLE_AUTH_FAILURE_LIMIT:-30}
+  EXPORT_PUBLIC: ${EXPORT_PUBLIC:-false}
+  EXPORT_WARM_ON_CHANGE: ${EXPORT_WARM_ON_CHANGE:-true}
+  CDN_PURGE_URL: ${CDN_PURGE_URL:-}
+  CDN_PURGE_TOKEN: ${CDN_PURGE_TOKEN:-}
+  CDN_PUBLIC_BASE_URL: ${CDN_PUBLIC_BASE_URL:-}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-translations}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-translations}
+      POSTGRES_DB: ${POSTGRES_DB:-translations}
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c work_mem=16MB
+      -c effective_cache_size=768MB
+      -c random_page_cost=1.1
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    # volatile-lru only evicts keys with a TTL (export cache, rate-limit counters);
+    # the catalog version counter has none and must never be evicted.
+    command: ["redis-server", "--save", "", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "volatile-lru"]
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build: .
+    image: translation-service:local
+    pull_policy: build # local image: always build from the Dockerfile, never pull
+    command: ["node", "dist/cli/migrate.js", "latest"]
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build: .
+    image: translation-service:local
+    pull_policy: build
+    environment: *app-env
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      start_period: 20s
+      retries: 5
+    restart: unless-stopped
+
+  seed:
+    profiles: ["seed"]
+    build: .
+    image: translation-service:local
+    pull_policy: build
+    command: ["node", "dist/cli/seed.js", "--keys=50000", "--locales=en,fr,es,de", "--tags=mobile,desktop,web", "--batch=5000", "--fresh"]
+    environment:
+      <<: *app-env
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:

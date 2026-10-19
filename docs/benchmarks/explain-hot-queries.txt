@@ -1,0 +1,1020 @@
+﻿
+> translation-management-service@1.0.0 perf:explain
+> ts-node --transpile-only test/perf/explain-hot-queries.ts
+
+
+=== list: first page (limit 50) [stmt 1/1] 1.111 ms — index only
+select "page".*, coalesce(( SELECT json_object_agg(l.code, t.value ORDER BY l.code) FROM translations t JOIN locales l ON l.id = t.locale_id WHERE t.translation_key_id = "page"."id" ), '{}'::json) as "values", coalesce(( SELECT json_agg(tg.name ORDER BY tg.name) FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "page"."id" ), '[]'::json) as "tags" from (select "id", "key", "description", "created_at", "updated_at" from "translation_keys" order by "id" limit $1) as "page" order by "page"."id"
+Subquery Scan on page  (cost=0.29..1344.69 rows=51 width=154) (actual time=0.125..0.984 rows=51 loops=1)
+  Buffers: shared hit=447
+  ->  Limit  (cost=0.29..3.80 rows=51 width=90) (actual time=0.022..0.057 rows=51 loops=1)
+        Buffers: shared hit=23
+        ->  Index Scan using translation_keys_pkey on translation_keys  (cost=0.29..3910.23 rows=56821 width=90) (actual time=0.021..0.051 rows=51 loops=1)
+              Buffers: shared hit=23
+  SubPlan 1
+    ->  Aggregate  (cost=16.83..16.84 rows=1 width=32) (actual time=0.010..0.010 rows=1 loops=51)
+          Buffers: shared hit=259
+          ->  Sort  (cost=16.81..16.82 rows=4 width=38) (actual time=0.007..0.007 rows=4 loops=51)
+                Sort Key: l.code
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=259
+                ->  Nested Loop  (cost=0.42..16.77 rows=4 width=38) (actual time=0.003..0.006 rows=4 loops=51)
+                      Join Filter: (t.locale_id = l.id)
+                      Rows Removed by Join Filter: 6
+                      Buffers: shared hit=259
+                      ->  Index Scan using translations_key_locale_unique on translations t  (cost=0.42..15.51 rows=4 width=37) (actual time=0.002..0.003 rows=4 loops=51)
+                            Index Cond: (translation_key_id = page.id)
+                            Buffers: shared hit=258
+                      ->  Materialize  (cost=0.00..1.06 rows=4 width=5) (actual time=0.000..0.000 rows=2 loops=204)
+                            Buffers: shared hit=1
+                            ->  Seq Scan on locales l  (cost=0.00..1.04 rows=4 width=5) (actual time=0.012..0.013 rows=4 loops=1)
+                                  Buffers: shared hit=1
+  SubPlan 2
+    ->  Aggregate  (cost=9.44..9.45 rows=1 width=32) (actual time=0.007..0.007 rows=1 loops=51)
+          Buffers: shared hit=165
+          ->  Sort  (cost=9.43..9.44 rows=1 width=6) (actual time=0.006..0.006 rows=1 loops=51)
+                Sort Key: tg.name
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=165
+                ->  Nested Loop  (cost=0.29..9.42 rows=1 width=6) (actual time=0.004..0.005 rows=1 loops=51)
+                      Join Filter: (tkt.tag_id = tg.id)
+                      Rows Removed by Join Filter: 1
+                      Buffers: shared hit=165
+                      ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt  (cost=0.29..8.31 rows=1 width=4) (actual time=0.001..0.001 rows=1 loops=51)
+                            Index Cond: (translation_key_id = page.id)
+                            Heap Fetches: 0
+                            Buffers: shared hit=103
+                      ->  Seq Scan on tags tg  (cost=0.00..1.05 rows=5 width=10) (actual time=0.000..0.000 rows=2 loops=62)
+                            Buffers: shared hit=62
+Planning:
+  Buffers: shared hit=8
+Planning Time: 0.747 ms
+Execution Time: 1.111 ms
+
+=== list: deep keyset page (cursor at 90%) [stmt 1/1] 0.105 ms — index only
+select "page".*, coalesce(( SELECT json_object_agg(l.code, t.value ORDER BY l.code) FROM translations t JOIN locales l ON l.id = t.locale_id WHERE t.translation_key_id = "page"."id" ), '{}'::json) as "values", coalesce(( SELECT json_agg(tg.name ORDER BY tg.name) FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "page"."id" ), '[]'::json) as "tags" from (select "id", "key", "description", "created_at", "updated_at" from "translation_keys" where "id" > $1 order by "id" limit $2) as "page" order by "page"."id"
+Subquery Scan on page  (cost=0.29..1356.34 rows=51 width=154) (actual time=0.050..0.068 rows=1 loops=1)
+  Buffers: shared hit=32
+  ->  Limit  (cost=0.29..15.45 rows=51 width=90) (actual time=0.007..0.025 rows=1 loops=1)
+        Buffers: shared hit=22
+        ->  Index Scan using translation_keys_pkey on translation_keys  (cost=0.29..1920.71 rows=6460 width=90) (actual time=0.006..0.024 rows=1 loops=1)
+              Index Cond: (id > '107342'::bigint)
+              Buffers: shared hit=22
+  SubPlan 1
+    ->  Aggregate  (cost=16.83..16.84 rows=1 width=32) (actual time=0.024..0.024 rows=1 loops=1)
+          Buffers: shared hit=5
+          ->  Sort  (cost=16.81..16.82 rows=4 width=38) (actual time=0.020..0.020 rows=2 loops=1)
+                Sort Key: l.code
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=5
+                ->  Nested Loop  (cost=0.42..16.77 rows=4 width=38) (actual time=0.013..0.015 rows=2 loops=1)
+                      Join Filter: (t.locale_id = l.id)
+                      Rows Removed by Join Filter: 1
+                      Buffers: shared hit=5
+                      ->  Index Scan using translations_key_locale_unique on translations t  (cost=0.42..15.51 rows=4 width=37) (actual time=0.006..0.007 rows=2 loops=1)
+                            Index Cond: (translation_key_id = page.id)
+                            Buffers: shared hit=4
+                      ->  Materialize  (cost=0.00..1.06 rows=4 width=5) (actual time=0.003..0.004 rows=2 loops=2)
+                            Buffers: shared hit=1
+                            ->  Seq Scan on locales l  (cost=0.00..1.04 rows=4 width=5) (actual time=0.004..0.005 rows=2 loops=1)
+                                  Buffers: shared hit=1
+  SubPlan 2
+    ->  Aggregate  (cost=9.44..9.45 rows=1 width=32) (actual time=0.016..0.016 rows=1 loops=1)
+          Buffers: shared hit=5
+          ->  Sort  (cost=9.43..9.44 rows=1 width=6) (actual time=0.015..0.015 rows=1 loops=1)
+                Sort Key: tg.name
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=5
+                ->  Nested Loop  (cost=0.29..9.42 rows=1 width=6) (actual time=0.011..0.012 rows=1 loops=1)
+                      Join Filter: (tkt.tag_id = tg.id)
+                      Rows Removed by Join Filter: 4
+                      Buffers: shared hit=5
+                      ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt  (cost=0.29..8.31 rows=1 width=4) (actual time=0.008..0.008 rows=1 loops=1)
+                            Index Cond: (translation_key_id = page.id)
+                            Heap Fetches: 1
+                            Buffers: shared hit=4
+                      ->  Seq Scan on tags tg  (cost=0.00..1.05 rows=5 width=10) (actual time=0.003..0.003 rows=5 loops=1)
+                            Buffers: shared hit=1
+Planning:
+  Buffers: shared hit=8
+Planning Time: 0.265 ms
+Execution Time: 0.105 ms
+
+=== search: key prefix "checkout.button." [stmt 1/1] 1.492 ms — index only
+select "page".*, coalesce(( SELECT json_object_agg(l.code, t.value ORDER BY l.code) FROM translations t JOIN locales l ON l.id = t.locale_id WHERE t.translation_key_id = "page"."id" ), '{}'::json) as "values", coalesce(( SELECT json_agg(tg.name ORDER BY tg.name) FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "page"."id" ), '[]'::json) as "tags" from (select "id", "key", "description", "created_at", "updated_at" from "translation_keys" where "key" like $1 order by "id" limit $2) as "page" order by "page"."id"
+Subquery Scan on page  (cost=27.59..1368.61 rows=51 width=154) (actual time=0.636..1.398 rows=51 loops=1)
+  Buffers: shared hit=1063
+  ->  Limit  (cost=27.59..27.71 rows=51 width=90) (actual time=0.564..0.569 rows=51 loops=1)
+        Buffers: shared hit=635
+        ->  Sort  (cost=27.59..29.02 rows=574 width=90) (actual time=0.563..0.566 rows=51 loops=1)
+              Sort Key: translation_keys.id
+              Sort Method: top-N heapsort  Memory: 32kB
+              Buffers: shared hit=635
+              ->  Index Scan using translation_keys_key_key on translation_keys  (cost=0.41..8.44 rows=574 width=90) (actual time=0.013..0.513 rows=625 loops=1)
+                    Index Cond: (((key)::text >= 'checkout.button.'::text) AND ((key)::text < 'checkout.button/'::text))
+                    Filter: ((key)::text ~~ 'checkout.button.%'::text)
+                    Buffers: shared hit=635
+  SubPlan 1
+    ->  Aggregate  (cost=16.83..16.84 rows=1 width=32) (actual time=0.009..0.009 rows=1 loops=51)
+          Buffers: shared hit=262
+          ->  Sort  (cost=16.81..16.82 rows=4 width=38) (actual time=0.007..0.008 rows=4 loops=51)
+                Sort Key: l.code
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=262
+                ->  Nested Loop  (cost=0.42..16.77 rows=4 width=38) (actual time=0.004..0.006 rows=4 loops=51)
+                      Join Filter: (t.locale_id = l.id)
+                      Rows Removed by Join Filter: 6
+                      Buffers: shared hit=262
+                      ->  Index Scan using translations_key_locale_unique on translations t  (cost=0.42..15.51 rows=4 width=37) (actual time=0.003..0.004 rows=4 loops=51)
+                            Index Cond: (translation_key_id = page.id)
+                            Buffers: shared hit=261
+                      ->  Materialize  (cost=0.00..1.06 rows=4 width=5) (actual time=0.000..0.000 rows=2 loops=204)
+                            Buffers: shared hit=1
+                            ->  Seq Scan on locales l  (cost=0.00..1.04 rows=4 width=5) (actual time=0.014..0.015 rows=4 loops=1)
+                                  Buffers: shared hit=1
+  SubPlan 2
+    ->  Aggregate  (cost=9.44..9.45 rows=1 width=32) (actual time=0.006..0.006 rows=1 loops=51)
+          Buffers: shared hit=166
+          ->  Sort  (cost=9.43..9.44 rows=1 width=6) (actual time=0.005..0.005 rows=1 loops=51)
+                Sort Key: tg.name
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=166
+                ->  Nested Loop  (cost=0.29..9.42 rows=1 width=6) (actual time=0.004..0.004 rows=1 loops=51)
+                      Join Filter: (tkt.tag_id = tg.id)
+                      Rows Removed by Join Filter: 1
+                      Buffers: shared hit=166
+                      ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt  (cost=0.29..8.31 rows=1 width=4) (actual time=0.001..0.002 rows=1 loops=51)
+                            Index Cond: (translation_key_id = page.id)
+                            Heap Fetches: 0
+                            Buffers: shared hit=103
+                      ->  Seq Scan on tags tg  (cost=0.00..1.05 rows=5 width=10) (actual time=0.000..0.000 rows=2 loops=63)
+                            Buffers: shared hit=63
+Planning:
+  Buffers: shared hit=8
+Planning Time: 0.371 ms
+Execution Time: 1.492 ms
+
+=== search: content word "payment" [stmt 1/1] 2.833 ms — index only
+select "page".*, coalesce(( SELECT json_object_agg(l.code, t.value ORDER BY l.code) FROM translations t JOIN locales l ON l.id = t.locale_id WHERE t.translation_key_id = "page"."id" ), '{}'::json) as "values", coalesce(( SELECT json_agg(tg.name ORDER BY tg.name) FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "page"."id" ), '[]'::json) as "tags" from (select "id", "key", "description", "created_at", "updated_at" from "translation_keys" where translation_keys.id <= $1 and EXISTS (SELECT 1 FROM translations t WHERE t.translation_key_id = translation_keys.id AND (t.search_vector @@ websearch_to_tsquery('simple', $2) OR t.value ILIKE $3)) order by "id" limit $4) as "page" order by "page"."id"
+Subquery Scan on page  (cost=0.71..2806.53 rows=51 width=154) (actual time=0.138..2.728 rows=51 loops=1)
+  Buffers: shared hit=2289
+  ->  Limit  (cost=0.71..1465.64 rows=51 width=90) (actual time=0.049..1.763 rows=51 loops=1)
+        Buffers: shared hit=1867
+        ->  Nested Loop Semi Join  (cost=0.71..20308.59 rows=707 width=90) (actual time=0.048..1.758 rows=51 loops=1)
+              Buffers: shared hit=1867
+              ->  Index Scan using translation_keys_pkey on translation_keys  (cost=0.29..1735.16 rows=2037 width=90) (actual time=0.013..0.169 rows=354 loops=1)
+                    Index Cond: (id <= '2000'::bigint)
+                    Buffers: shared hit=143
+              ->  Index Scan using translations_key_locale_unique on translations t  (cost=0.42..9.11 rows=1 width=8) (actual time=0.004..0.004 rows=0 loops=354)
+                    Index Cond: (translation_key_id = translation_keys.id)
+                    Filter: ((search_vector @@ '''payment'''::tsquery) OR (value ~~* '%payment%'::text))
+                    Rows Removed by Filter: 3
+                    Buffers: shared hit=1724
+  SubPlan 1
+    ->  Aggregate  (cost=16.83..16.84 rows=1 width=32) (actual time=0.010..0.010 rows=1 loops=51)
+          Buffers: shared hit=256
+          ->  Sort  (cost=16.81..16.82 rows=4 width=38) (actual time=0.007..0.007 rows=4 loops=51)
+                Sort Key: l.code
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=256
+                ->  Nested Loop  (cost=0.42..16.77 rows=4 width=38) (actual time=0.002..0.005 rows=4 loops=51)
+                      Join Filter: (t_1.locale_id = l.id)
+                      Rows Removed by Join Filter: 6
+                      Buffers: shared hit=256
+                      ->  Index Scan using translations_key_locale_unique on translations t_1  (cost=0.42..15.51 rows=4 width=37) (actual time=0.001..0.003 rows=4 loops=51)
+                            Index Cond: (translation_key_id = page.id)
+                            Buffers: shared hit=255
+                      ->  Materialize  (cost=0.00..1.06 rows=4 width=5) (actual time=0.000..0.000 rows=2 loops=204)
+                            Buffers: shared hit=1
+                            ->  Seq Scan on locales l  (cost=0.00..1.04 rows=4 width=5) (actual time=0.024..0.025 rows=4 loops=1)
+                                  Buffers: shared hit=1
+  SubPlan 2
+    ->  Aggregate  (cost=9.44..9.45 rows=1 width=32) (actual time=0.008..0.008 rows=1 loops=51)
+          Buffers: shared hit=166
+          ->  Sort  (cost=9.43..9.44 rows=1 width=6) (actual time=0.007..0.007 rows=1 loops=51)
+                Sort Key: tg.name
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=166
+                ->  Nested Loop  (cost=0.29..9.42 rows=1 width=6) (actual time=0.005..0.006 rows=1 loops=51)
+                      Join Filter: (tkt.tag_id = tg.id)
+                      Rows Removed by Join Filter: 1
+                      Buffers: shared hit=166
+                      ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt  (cost=0.29..8.31 rows=1 width=4) (actual time=0.001..0.002 rows=1 loops=51)
+                            Index Cond: (translation_key_id = page.id)
+                            Heap Fetches: 0
+                            Buffers: shared hit=103
+                      ->  Seq Scan on tags tg  (cost=0.00..1.05 rows=5 width=10) (actual time=0.000..0.001 rows=2 loops=63)
+                            Buffers: shared hit=63
+Planning:
+  Buffers: shared hit=147
+Planning Time: 1.030 ms
+Execution Time: 2.833 ms
+
+=== search: content substring "ccoun" [stmt 1/1] 1.892 ms — index only
+select "page".*, coalesce(( SELECT json_object_agg(l.code, t.value ORDER BY l.code) FROM translations t JOIN locales l ON l.id = t.locale_id WHERE t.translation_key_id = "page"."id" ), '{}'::json) as "values", coalesce(( SELECT json_agg(tg.name ORDER BY tg.name) FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "page"."id" ), '[]'::json) as "tags" from (select "id", "key", "description", "created_at", "updated_at" from "translation_keys" where translation_keys.id <= $1 and EXISTS (SELECT 1 FROM translations t WHERE t.translation_key_id = translation_keys.id AND (t.search_vector @@ websearch_to_tsquery('simple', $2) OR t.value ILIKE $3)) order by "id" limit $4) as "page" order by "page"."id"
+Subquery Scan on page  (cost=0.71..5692.29 rows=51 width=154) (actual time=0.069..1.818 rows=51 loops=1)
+  Buffers: shared hit=2090
+  ->  Limit  (cost=0.71..4351.39 rows=51 width=90) (actual time=0.024..1.140 rows=51 loops=1)
+        Buffers: shared hit=1669
+        ->  Nested Loop Semi Join  (cost=0.71..20303.90 rows=238 width=90) (actual time=0.023..1.136 rows=51 loops=1)
+              Buffers: shared hit=1669
+              ->  Index Scan using translation_keys_pkey on translation_keys  (cost=0.29..1735.16 rows=2037 width=90) (actual time=0.008..0.109 rows=318 loops=1)
+                    Index Cond: (id <= '2000'::bigint)
+                    Buffers: shared hit=129
+              ->  Index Scan using translations_key_locale_unique on translations t  (cost=0.42..9.11 rows=1 width=8) (actual time=0.003..0.003 rows=0 loops=318)
+                    Index Cond: (translation_key_id = translation_keys.id)
+                    Filter: ((search_vector @@ '''ccoun'''::tsquery) OR (value ~~* '%ccoun%'::text))
+                    Rows Removed by Filter: 3
+                    Buffers: shared hit=1540
+  SubPlan 1
+    ->  Aggregate  (cost=16.83..16.84 rows=1 width=32) (actual time=0.007..0.007 rows=1 loops=51)
+          Buffers: shared hit=261
+          ->  Sort  (cost=16.81..16.82 rows=4 width=38) (actual time=0.005..0.005 rows=4 loops=51)
+                Sort Key: l.code
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=261
+                ->  Nested Loop  (cost=0.42..16.77 rows=4 width=38) (actual time=0.002..0.004 rows=4 loops=51)
+                      Join Filter: (t_1.locale_id = l.id)
+                      Rows Removed by Join Filter: 6
+                      Buffers: shared hit=261
+                      ->  Index Scan using translations_key_locale_unique on translations t_1  (cost=0.42..15.51 rows=4 width=37) (actual time=0.001..0.002 rows=4 loops=51)
+                            Index Cond: (translation_key_id = page.id)
+                            Buffers: shared hit=260
+                      ->  Materialize  (cost=0.00..1.06 rows=4 width=5) (actual time=0.000..0.000 rows=2 loops=204)
+                            Buffers: shared hit=1
+                            ->  Seq Scan on locales l  (cost=0.00..1.04 rows=4 width=5) (actual time=0.009..0.009 rows=4 loops=1)
+                                  Buffers: shared hit=1
+  SubPlan 2
+    ->  Aggregate  (cost=9.44..9.45 rows=1 width=32) (actual time=0.005..0.006 rows=1 loops=51)
+          Buffers: shared hit=160
+          ->  Sort  (cost=9.43..9.44 rows=1 width=6) (actual time=0.005..0.005 rows=1 loops=51)
+                Sort Key: tg.name
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=160
+                ->  Nested Loop  (cost=0.29..9.42 rows=1 width=6) (actual time=0.003..0.004 rows=1 loops=51)
+                      Join Filter: (tkt.tag_id = tg.id)
+                      Rows Removed by Join Filter: 1
+                      Buffers: shared hit=160
+                      ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt  (cost=0.29..8.31 rows=1 width=4) (actual time=0.001..0.001 rows=1 loops=51)
+                            Index Cond: (translation_key_id = page.id)
+                            Heap Fetches: 0
+                            Buffers: shared hit=103
+                      ->  Seq Scan on tags tg  (cost=0.00..1.05 rows=5 width=10) (actual time=0.000..0.000 rows=2 loops=57)
+                            Buffers: shared hit=57
+Planning:
+  Buffers: shared hit=148
+Planning Time: 0.700 ms
+Execution Time: 1.892 ms
+
+=== search: content with no match "zqxjkv" [stmt 1/2] 0.193 ms — index only
+select "page".*, coalesce(( SELECT json_object_agg(l.code, t.value ORDER BY l.code) FROM translations t JOIN locales l ON l.id = t.locale_id WHERE t.translation_key_id = "page"."id" ), '{}'::json) as "values", coalesce(( SELECT json_agg(tg.name ORDER BY tg.name) FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "page"."id" ), '[]'::json) as "tags" from (select "id", "key", "description", "created_at", "updated_at" from "translation_keys" where translation_keys.id <= $1 and EXISTS (SELECT 1 FROM translations t WHERE t.translation_key_id = translation_keys.id AND (t.search_vector @@ websearch_to_tsquery('simple', $2) OR t.value ILIKE $3)) order by "id" limit $4) as "page" order by "page"."id"
+Subquery Scan on page  (cost=1713.62..1897.68 rows=7 width=154) (actual time=0.103..0.105 rows=0 loops=1)
+  Buffers: shared hit=21
+  ->  Limit  (cost=1713.62..1713.64 rows=7 width=90) (actual time=0.103..0.104 rows=0 loops=1)
+        Buffers: shared hit=21
+        ->  Sort  (cost=1713.62..1713.64 rows=7 width=90) (actual time=0.102..0.103 rows=0 loops=1)
+              Sort Key: translation_keys.id
+              Sort Method: quicksort  Memory: 25kB
+              Buffers: shared hit=21
+              ->  Hash Semi Join  (cost=754.61..1713.52 rows=7 width=90) (actual time=0.099..0.100 rows=0 loops=1)
+                    Hash Cond: (translation_keys.id = t.translation_key_id)
+                    Buffers: shared hit=21
+                    ->  Bitmap Heap Scan on translation_keys  (cost=52.08..1005.54 rows=2037 width=90) (actual time=0.077..0.077 rows=1 loops=1)
+                          Recheck Cond: (id <= '2000'::bigint)
+                          Heap Blocks: exact=1
+                          Buffers: shared hit=8
+                          ->  Bitmap Index Scan on translation_keys_pkey  (cost=0.00..51.57 rows=2037 width=0) (actual time=0.061..0.061 rows=2000 loops=1)
+                                Index Cond: (id <= '2000'::bigint)
+                                Buffers: shared hit=7
+                    ->  Hash  (cost=700.22..700.22 rows=185 width=8) (actual time=0.015..0.015 rows=0 loops=1)
+                          Buckets: 1024  Batches: 1  Memory Usage: 8kB
+                          Buffers: shared hit=13
+                          ->  Bitmap Heap Scan on translations t  (cost=73.46..700.22 rows=185 width=8) (actual time=0.014..0.014 rows=0 loops=1)
+                                Recheck Cond: ((search_vector @@ '''zqxjkv'''::tsquery) OR (value ~~* '%zqxjkv%'::text))
+                                Buffers: shared hit=13
+                                ->  BitmapOr  (cost=73.46..73.46 rows=185 width=0) (actual time=0.014..0.014 rows=0 loops=1)
+                                      Buffers: shared hit=13
+                                      ->  Bitmap Index Scan on translations_search_vector_idx  (cost=0.00..17.91 rows=164 width=0) (actual time=0.006..0.006 rows=0 loops=1)
+                                            Index Cond: (search_vector @@ '''zqxjkv'''::tsquery)
+                                            Buffers: shared hit=4
+                                      ->  Bitmap Index Scan on translations_value_trgm_idx  (cost=0.00..55.46 rows=21 width=0) (actual time=0.008..0.008 rows=0 loops=1)
+                                            Index Cond: (value ~~* '%zqxjkv%'::text)
+                                            Buffers: shared hit=9
+  SubPlan 1
+    ->  Aggregate  (cost=16.83..16.84 rows=1 width=32) (never executed)
+          ->  Sort  (cost=16.81..16.82 rows=4 width=38) (never executed)
+                Sort Key: l.code
+                ->  Nested Loop  (cost=0.42..16.77 rows=4 width=38) (never executed)
+                      Join Filter: (t_1.locale_id = l.id)
+                      ->  Index Scan using translations_key_locale_unique on translations t_1  (cost=0.42..15.51 rows=4 width=37) (never executed)
+                            Index Cond: (translation_key_id = page.id)
+                      ->  Materialize  (cost=0.00..1.06 rows=4 width=5) (never executed)
+                            ->  Seq Scan on locales l  (cost=0.00..1.04 rows=4 width=5) (never executed)
+  SubPlan 2
+    ->  Aggregate  (cost=9.44..9.45 rows=1 width=32) (never executed)
+          ->  Sort  (cost=9.43..9.44 rows=1 width=6) (never executed)
+                Sort Key: tg.name
+                ->  Nested Loop  (cost=0.29..9.42 rows=1 width=6) (never executed)
+                      Join Filter: (tkt.tag_id = tg.id)
+                      ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt  (cost=0.29..8.31 rows=1 width=4) (never executed)
+                            Index Cond: (translation_key_id = page.id)
+                            Heap Fetches: 0
+                      ->  Seq Scan on tags tg  (cost=0.00..1.05 rows=5 width=10) (never executed)
+Planning:
+  Buffers: shared hit=150
+Planning Time: 0.573 ms
+Execution Time: 0.193 ms
+
+=== search: content with no match "zqxjkv" [stmt 2/2] 0.169 ms — index only
+select "page".*, coalesce(( SELECT json_object_agg(l.code, t.value ORDER BY l.code) FROM translations t JOIN locales l ON l.id = t.locale_id WHERE t.translation_key_id = "page"."id" ), '{}'::json) as "values", coalesce(( SELECT json_agg(tg.name ORDER BY tg.name) FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "page"."id" ), '[]'::json) as "tags" from (select "id", "key", "description", "created_at", "updated_at" from "translation_keys" where translation_keys.id IN ( WITH hits AS MATERIALIZED ( SELECT DISTINCT t.translation_key_id FROM translations t WHERE (t.search_vector @@ websearch_to_tsquery('simple', $1) OR t.value ILIKE $2) ) SELECT translation_key_id FROM hits ) order by "id" limit $3) as "page" order by "page"."id"
+Subquery Scan on page  (cost=719.07..3177.76 rows=51 width=154) (actual time=0.050..0.051 rows=0 loops=1)
+  Buffers: shared hit=16
+  ->  Limit  (cost=719.07..1836.87 rows=51 width=90) (actual time=0.049..0.050 rows=0 loops=1)
+        Buffers: shared hit=16
+        ->  Merge Semi Join  (cost=719.07..4773.83 rows=185 width=90) (actual time=0.049..0.049 rows=0 loops=1)
+              Merge Cond: (translation_keys.id = hits.translation_key_id)
+              Buffers: shared hit=16
+              ->  Index Scan using translation_keys_pkey on translation_keys  (cost=0.29..3910.23 rows=56821 width=90) (actual time=0.013..0.013 rows=1 loops=1)
+                    Buffers: shared hit=3
+              ->  Sort  (cost=718.78..719.24 rows=185 width=8) (actual time=0.033..0.034 rows=0 loops=1)
+                    Sort Key: hits.translation_key_id
+                    Sort Method: quicksort  Memory: 25kB
+                    Buffers: shared hit=13
+                    ->  CTE Scan on hits  (cost=708.11..711.81 rows=185 width=8) (actual time=0.030..0.030 rows=0 loops=1)
+                          Buffers: shared hit=13
+                          CTE hits
+                            ->  Unique  (cost=707.19..708.11 rows=185 width=8) (actual time=0.029..0.029 rows=0 loops=1)
+                                  Buffers: shared hit=13
+                                  ->  Sort  (cost=707.19..707.65 rows=185 width=8) (actual time=0.029..0.029 rows=0 loops=1)
+                                        Sort Key: t_1.translation_key_id
+                                        Sort Method: quicksort  Memory: 25kB
+                                        Buffers: shared hit=13
+                                        ->  Bitmap Heap Scan on translations t_1  (cost=73.46..700.22 rows=185 width=8) (actual time=0.026..0.026 rows=0 loops=1)
+                                              Recheck Cond: ((search_vector @@ '''zqxjkv'''::tsquery) OR (value ~~* '%zqxjkv%'::text))
+                                              Buffers: shared hit=13
+                                              ->  BitmapOr  (cost=73.46..73.46 rows=185 width=0) (actual time=0.025..0.025 rows=0 loops=1)
+                                                    Buffers: shared hit=13
+                                                    ->  Bitmap Index Scan on translations_search_vector_idx  (cost=0.00..17.91 rows=164 width=0) (actual time=0.012..0.012 rows=0 loops=1)
+                                                          Index Cond: (search_vector @@ '''zqxjkv'''::tsquery)
+                                                          Buffers: shared hit=4
+                                                    ->  Bitmap Index Scan on translations_value_trgm_idx  (cost=0.00..55.46 rows=21 width=0) (actual time=0.013..0.013 rows=0 loops=1)
+                                                          Index Cond: (value ~~* '%zqxjkv%'::text)
+                                                          Buffers: shared hit=9
+  SubPlan 1
+    ->  Aggregate  (cost=16.83..16.84 rows=1 width=32) (never executed)
+          ->  Sort  (cost=16.81..16.82 rows=4 width=38) (never executed)
+                Sort Key: l.code
+                ->  Nested Loop  (cost=0.42..16.77 rows=4 width=38) (never executed)
+                      Join Filter: (t.locale_id = l.id)
+                      ->  Index Scan using translations_key_locale_unique on translations t  (cost=0.42..15.51 rows=4 width=37) (never executed)
+                            Index Cond: (translation_key_id = page.id)
+                      ->  Materialize  (cost=0.00..1.06 rows=4 width=5) (never executed)
+                            ->  Seq Scan on locales l  (cost=0.00..1.04 rows=4 width=5) (never executed)
+  SubPlan 2
+    ->  Aggregate  (cost=9.44..9.45 rows=1 width=32) (never executed)
+          ->  Sort  (cost=9.43..9.44 rows=1 width=6) (never executed)
+                Sort Key: tg.name
+                ->  Nested Loop  (cost=0.29..9.42 rows=1 width=6) (never executed)
+                      Join Filter: (tkt.tag_id = tg.id)
+                      ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt  (cost=0.29..8.31 rows=1 width=4) (never executed)
+                            Index Cond: (translation_key_id = page.id)
+                            Heap Fetches: 0
+                      ->  Seq Scan on tags tg  (cost=0.00..1.05 rows=5 width=10) (never executed)
+Planning:
+  Buffers: shared hit=10
+Planning Time: 0.629 ms
+Execution Time: 0.169 ms
+
+=== search: content rare substring "#4999" [stmt 1/2] 0.898 ms — index only
+select "page".*, coalesce(( SELECT json_object_agg(l.code, t.value ORDER BY l.code) FROM translations t JOIN locales l ON l.id = t.locale_id WHERE t.translation_key_id = "page"."id" ), '{}'::json) as "values", coalesce(( SELECT json_agg(tg.name ORDER BY tg.name) FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "page"."id" ), '[]'::json) as "tags" from (select "id", "key", "description", "created_at", "updated_at" from "translation_keys" where translation_keys.id <= $1 and EXISTS (SELECT 1 FROM translations t WHERE t.translation_key_id = translation_keys.id AND (t.search_vector @@ websearch_to_tsquery('simple', $2) OR t.value ILIKE $3)) order by "id" limit $4) as "page" order by "page"."id"
+Subquery Scan on page  (cost=1713.62..1897.68 rows=7 width=154) (actual time=0.787..0.790 rows=0 loops=1)
+  Buffers: shared hit=203
+  ->  Limit  (cost=1713.62..1713.64 rows=7 width=90) (actual time=0.786..0.788 rows=0 loops=1)
+        Buffers: shared hit=203
+        ->  Sort  (cost=1713.62..1713.64 rows=7 width=90) (actual time=0.786..0.787 rows=0 loops=1)
+              Sort Key: translation_keys.id
+              Sort Method: quicksort  Memory: 25kB
+              Buffers: shared hit=203
+              ->  Hash Semi Join  (cost=754.61..1713.52 rows=7 width=90) (actual time=0.782..0.783 rows=0 loops=1)
+                    Hash Cond: (translation_keys.id = t.translation_key_id)
+                    Buffers: shared hit=203
+                    ->  Bitmap Heap Scan on translation_keys  (cost=52.08..1005.54 rows=2037 width=90) (actual time=0.084..0.383 rows=2000 loops=1)
+                          Recheck Cond: (id <= '2000'::bigint)
+                          Heap Blocks: exact=160
+                          Buffers: shared hit=167
+                          ->  Bitmap Index Scan on translation_keys_pkey  (cost=0.00..51.57 rows=2037 width=0) (actual time=0.068..0.068 rows=2000 loops=1)
+                                Index Cond: (id <= '2000'::bigint)
+                                Buffers: shared hit=7
+                    ->  Hash  (cost=700.22..700.22 rows=185 width=8) (actual time=0.291..0.292 rows=43 loops=1)
+                          Buckets: 1024  Batches: 1  Memory Usage: 10kB
+                          Buffers: shared hit=36
+                          ->  Bitmap Heap Scan on translations t  (cost=73.46..700.22 rows=185 width=8) (actual time=0.263..0.286 rows=43 loops=1)
+                                Recheck Cond: ((search_vector @@ '''4999'''::tsquery) OR (value ~~* '%#4999%'::text))
+                                Heap Blocks: exact=5
+                                Buffers: shared hit=36
+                                ->  BitmapOr  (cost=73.46..73.46 rows=185 width=0) (actual time=0.259..0.260 rows=0 loops=1)
+                                      Buffers: shared hit=31
+                                      ->  Bitmap Index Scan on translations_search_vector_idx  (cost=0.00..17.91 rows=164 width=0) (actual time=0.013..0.013 rows=7 loops=1)
+                                            Index Cond: (search_vector @@ '''4999'''::tsquery)
+                                            Buffers: shared hit=4
+                                      ->  Bitmap Index Scan on translations_value_trgm_idx  (cost=0.00..55.46 rows=21 width=0) (actual time=0.246..0.246 rows=47 loops=1)
+                                            Index Cond: (value ~~* '%#4999%'::text)
+                                            Buffers: shared hit=27
+  SubPlan 1
+    ->  Aggregate  (cost=16.83..16.84 rows=1 width=32) (never executed)
+          ->  Sort  (cost=16.81..16.82 rows=4 width=38) (never executed)
+                Sort Key: l.code
+                ->  Nested Loop  (cost=0.42..16.77 rows=4 width=38) (never executed)
+                      Join Filter: (t_1.locale_id = l.id)
+                      ->  Index Scan using translations_key_locale_unique on translations t_1  (cost=0.42..15.51 rows=4 width=37) (never executed)
+                            Index Cond: (translation_key_id = page.id)
+                      ->  Materialize  (cost=0.00..1.06 rows=4 width=5) (never executed)
+                            ->  Seq Scan on locales l  (cost=0.00..1.04 rows=4 width=5) (never executed)
+  SubPlan 2
+    ->  Aggregate  (cost=9.44..9.45 rows=1 width=32) (never executed)
+          ->  Sort  (cost=9.43..9.44 rows=1 width=6) (never executed)
+                Sort Key: tg.name
+                ->  Nested Loop  (cost=0.29..9.42 rows=1 width=6) (never executed)
+                      Join Filter: (tkt.tag_id = tg.id)
+                      ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt  (cost=0.29..8.31 rows=1 width=4) (never executed)
+                            Index Cond: (translation_key_id = page.id)
+                            Heap Fetches: 0
+                      ->  Seq Scan on tags tg  (cost=0.00..1.05 rows=5 width=10) (never executed)
+Planning:
+  Buffers: shared hit=151
+Planning Time: 0.647 ms
+Execution Time: 0.898 ms
+
+=== search: content rare substring "#4999" [stmt 2/2] 9.100 ms — index only
+select "page".*, coalesce(( SELECT json_object_agg(l.code, t.value ORDER BY l.code) FROM translations t JOIN locales l ON l.id = t.locale_id WHERE t.translation_key_id = "page"."id" ), '{}'::json) as "values", coalesce(( SELECT json_agg(tg.name ORDER BY tg.name) FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "page"."id" ), '[]'::json) as "tags" from (select "id", "key", "description", "created_at", "updated_at" from "translation_keys" where translation_keys.id IN ( WITH hits AS MATERIALIZED ( SELECT DISTINCT t.translation_key_id FROM translations t WHERE (t.search_vector @@ websearch_to_tsquery('simple', $1) OR t.value ILIKE $2) ) SELECT translation_key_id FROM hits ) order by "id" limit $3) as "page" order by "page"."id"
+Subquery Scan on page  (cost=719.07..3177.76 rows=51 width=154) (actual time=1.623..9.003 rows=11 loops=1)
+  Buffers: shared hit=9609
+  ->  Limit  (cost=719.07..1836.87 rows=51 width=90) (actual time=1.552..8.745 rows=11 loops=1)
+        Buffers: shared hit=9514
+        ->  Merge Semi Join  (cost=719.07..4773.83 rows=185 width=90) (actual time=1.551..8.743 rows=11 loops=1)
+              Merge Cond: (translation_keys.id = hits.translation_key_id)
+              Buffers: shared hit=9514
+              ->  Index Scan using translation_keys_pkey on translation_keys  (cost=0.29..3910.23 rows=56821 width=90) (actual time=0.008..6.243 rows=50001 loops=1)
+                    Buffers: shared hit=9478
+              ->  Sort  (cost=718.78..719.24 rows=185 width=8) (actual time=0.300..0.304 rows=11 loops=1)
+                    Sort Key: hits.translation_key_id
+                    Sort Method: quicksort  Memory: 25kB
+                    Buffers: shared hit=36
+                    ->  CTE Scan on hits  (cost=708.11..711.81 rows=185 width=8) (actual time=0.291..0.299 rows=11 loops=1)
+                          Buffers: shared hit=36
+                          CTE hits
+                            ->  Unique  (cost=707.19..708.11 rows=185 width=8) (actual time=0.290..0.296 rows=11 loops=1)
+                                  Buffers: shared hit=36
+                                  ->  Sort  (cost=707.19..707.65 rows=185 width=8) (actual time=0.289..0.292 rows=43 loops=1)
+                                        Sort Key: t_1.translation_key_id
+                                        Sort Method: quicksort  Memory: 25kB
+                                        Buffers: shared hit=36
+                                        ->  Bitmap Heap Scan on translations t_1  (cost=73.46..700.22 rows=185 width=8) (actual time=0.263..0.286 rows=43 loops=1)
+                                              Recheck Cond: ((search_vector @@ '''4999'''::tsquery) OR (value ~~* '%#4999%'::text))
+                                              Heap Blocks: exact=5
+                                              Buffers: shared hit=36
+                                              ->  BitmapOr  (cost=73.46..73.46 rows=185 width=0) (actual time=0.258..0.259 rows=0 loops=1)
+                                                    Buffers: shared hit=31
+                                                    ->  Bitmap Index Scan on translations_search_vector_idx  (cost=0.00..17.91 rows=164 width=0) (actual time=0.013..0.013 rows=7 loops=1)
+                                                          Index Cond: (search_vector @@ '''4999'''::tsquery)
+                                                          Buffers: shared hit=4
+                                                    ->  Bitmap Index Scan on translations_value_trgm_idx  (cost=0.00..55.46 rows=21 width=0) (actual time=0.245..0.245 rows=47 loops=1)
+                                                          Index Cond: (value ~~* '%#4999%'::text)
+                                                          Buffers: shared hit=27
+  SubPlan 1
+    ->  Aggregate  (cost=16.83..16.84 rows=1 width=32) (actual time=0.012..0.012 rows=1 loops=11)
+          Buffers: shared hit=48
+          ->  Sort  (cost=16.81..16.82 rows=4 width=38) (actual time=0.009..0.009 rows=4 loops=11)
+                Sort Key: l.code
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=48
+                ->  Nested Loop  (cost=0.42..16.77 rows=4 width=38) (actual time=0.004..0.006 rows=4 loops=11)
+                      Join Filter: (t.locale_id = l.id)
+                      Rows Removed by Join Filter: 6
+                      Buffers: shared hit=48
+                      ->  Index Scan using translations_key_locale_unique on translations t  (cost=0.42..15.51 rows=4 width=37) (actual time=0.002..0.003 rows=4 loops=11)
+                            Index Cond: (translation_key_id = page.id)
+                            Buffers: shared hit=47
+                      ->  Materialize  (cost=0.00..1.06 rows=4 width=5) (actual time=0.000..0.000 rows=2 loops=44)
+                            Buffers: shared hit=1
+                            ->  Seq Scan on locales l  (cost=0.00..1.04 rows=4 width=5) (actual time=0.012..0.013 rows=4 loops=1)
+                                  Buffers: shared hit=1
+  SubPlan 2
+    ->  Aggregate  (cost=9.44..9.45 rows=1 width=32) (actual time=0.009..0.010 rows=1 loops=11)
+          Buffers: shared hit=47
+          ->  Sort  (cost=9.43..9.44 rows=1 width=6) (actual time=0.008..0.008 rows=1 loops=11)
+                Sort Key: tg.name
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=47
+                ->  Nested Loop  (cost=0.29..9.42 rows=1 width=6) (actual time=0.006..0.007 rows=1 loops=11)
+                      Join Filter: (tkt.tag_id = tg.id)
+                      Rows Removed by Join Filter: 1
+                      Buffers: shared hit=47
+                      ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt  (cost=0.29..8.31 rows=1 width=4) (actual time=0.002..0.002 rows=1 loops=11)
+                            Index Cond: (translation_key_id = page.id)
+                            Heap Fetches: 13
+                            Buffers: shared hit=33
+                      ->  Seq Scan on tags tg  (cost=0.00..1.05 rows=5 width=10) (actual time=0.001..0.001 rows=2 loops=14)
+                            Buffers: shared hit=14
+Planning:
+  Buffers: shared hit=10
+Planning Time: 0.425 ms
+Execution Time: 9.100 ms
+
+=== search: content word "bestellung" in de [stmt 1/1] 1.583 ms — index only
+select "page".*, coalesce(( SELECT json_object_agg(l.code, t.value ORDER BY l.code) FROM translations t JOIN locales l ON l.id = t.locale_id WHERE t.translation_key_id = "page"."id" AND t.locale_id = (SELECT l.id FROM locales l WHERE l.code = $1) ), '{}'::json) as "values", coalesce(( SELECT json_agg(tg.name ORDER BY tg.name) FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "page"."id" ), '[]'::json) as "tags" from (select "id", "key", "description", "created_at", "updated_at" from "translation_keys" where translation_keys.id <= $2 and EXISTS (SELECT 1 FROM translations t WHERE t.translation_key_id = translation_keys.id AND (t.search_vector @@ websearch_to_tsquery('simple', $3) OR t.value ILIKE $4) AND t.locale_id = (SELECT l.id FROM locales l WHERE l.code = $5)) order by "id" limit $6) as "page" order by "page"."id"
+Subquery Scan on page  (cost=1.76..4619.56 rows=51 width=154) (actual time=0.097..1.479 rows=51 loops=1)
+  Buffers: shared hit=1478
+  ->  Limit  (cost=1.76..3597.90 rows=51 width=90) (actual time=0.043..0.678 rows=51 loops=1)
+        Buffers: shared hit=1060
+        InitPlan 4 (returns $3)
+          ->  Seq Scan on locales l_2  (cost=0.00..1.05 rows=1 width=2) (actual time=0.011..0.012 rows=1 loops=1)
+                Filter: ((code)::text = 'de'::text)
+                Rows Removed by Filter: 3
+                Buffers: shared hit=1
+        ->  Nested Loop  (cost=0.71..13609.63 rows=193 width=90) (actual time=0.043..0.673 rows=51 loops=1)
+              Buffers: shared hit=1060
+              ->  Index Scan using translation_keys_pkey on translation_keys  (cost=0.29..1735.16 rows=2037 width=90) (actual time=0.009..0.124 rows=241 loops=1)
+                    Index Cond: (id <= '2000'::bigint)
+                    Buffers: shared hit=95
+              ->  Index Scan using translations_key_locale_unique on translations t  (cost=0.42..5.83 rows=1 width=8) (actual time=0.002..0.002 rows=0 loops=241)
+                    Index Cond: ((translation_key_id = translation_keys.id) AND (locale_id = $3))
+                    Filter: ((search_vector @@ '''bestellung'''::tsquery) OR (value ~~* '%bestellung%'::text))
+                    Rows Removed by Filter: 1
+                    Buffers: shared hit=964
+  SubPlan 2
+    ->  Aggregate  (cost=10.57..10.58 rows=1 width=32) (actual time=0.008..0.008 rows=1 loops=51)
+          Buffers: shared hit=256
+          InitPlan 1 (returns $0)
+            ->  Seq Scan on locales l  (cost=0.00..1.05 rows=1 width=2) (actual time=0.003..0.003 rows=1 loops=1)
+                  Filter: ((code)::text = 'de'::text)
+                  Rows Removed by Filter: 3
+                  Buffers: shared hit=1
+          ->  Sort  (cost=9.51..9.52 rows=1 width=38) (actual time=0.006..0.006 rows=1 loops=51)
+                Sort Key: l_1.code
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=256
+                ->  Nested Loop  (cost=0.42..9.50 rows=1 width=38) (actual time=0.005..0.005 rows=1 loops=51)
+                      Buffers: shared hit=256
+                      ->  Index Scan using translations_locale_key_idx on translations t_1  (cost=0.42..8.44 rows=1 width=37) (actual time=0.001..0.002 rows=1 loops=51)
+                            Index Cond: ((locale_id = $0) AND (translation_key_id = page.id))
+                            Buffers: shared hit=204
+                      ->  Seq Scan on locales l_1  (cost=0.00..1.05 rows=1 width=5) (actual time=0.001..0.001 rows=1 loops=51)
+                            Filter: (id = $0)
+                            Rows Removed by Filter: 3
+                            Buffers: shared hit=51
+  SubPlan 3
+    ->  Aggregate  (cost=9.44..9.45 rows=1 width=32) (actual time=0.007..0.007 rows=1 loops=51)
+          Buffers: shared hit=162
+          ->  Sort  (cost=9.43..9.44 rows=1 width=6) (actual time=0.006..0.006 rows=1 loops=51)
+                Sort Key: tg.name
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=162
+                ->  Nested Loop  (cost=0.29..9.42 rows=1 width=6) (actual time=0.004..0.005 rows=1 loops=51)
+                      Join Filter: (tkt.tag_id = tg.id)
+                      Rows Removed by Join Filter: 1
+                      Buffers: shared hit=162
+                      ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt  (cost=0.29..8.31 rows=1 width=4) (actual time=0.001..0.001 rows=1 loops=51)
+                            Index Cond: (translation_key_id = page.id)
+                            Heap Fetches: 0
+                            Buffers: shared hit=103
+                      ->  Seq Scan on tags tg  (cost=0.00..1.05 rows=5 width=10) (actual time=0.000..0.000 rows=2 loops=59)
+                            Buffers: shared hit=59
+Planning:
+  Buffers: shared hit=149
+Planning Time: 0.665 ms
+Execution Time: 1.583 ms
+
+=== search: tags any "mobile" [stmt 1/1] 1.178 ms — index only
+select "page".*, coalesce(( SELECT json_object_agg(l.code, t.value ORDER BY l.code) FROM translations t JOIN locales l ON l.id = t.locale_id WHERE t.translation_key_id = "page"."id" ), '{}'::json) as "values", coalesce(( SELECT json_agg(tg.name ORDER BY tg.name) FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "page"."id" ), '[]'::json) as "tags" from (select "id", "key", "description", "created_at", "updated_at" from "translation_keys" where translation_keys.id <= $1 and EXISTS ( SELECT 1 FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "translation_keys"."id" AND tg.name = ANY($2::text[]) ) order by "id" limit $3) as "page" order by "page"."id"
+Subquery Scan on page  (cost=0.71..1820.23 rows=51 width=154) (actual time=0.078..1.088 rows=51 loops=1)
+  Buffers: shared hit=1113
+  ->  Limit  (cost=0.71..479.34 rows=51 width=90) (actual time=0.022..0.349 rows=51 loops=1)
+        Buffers: shared hit=679
+        ->  Nested Loop Semi Join  (cost=0.71..4618.01 rows=492 width=90) (actual time=0.021..0.345 rows=51 loops=1)
+              Buffers: shared hit=679
+              ->  Index Scan using translation_keys_pkey on translation_keys  (cost=0.29..1735.16 rows=2037 width=90) (actual time=0.008..0.059 rows=145 loops=1)
+                    Index Cond: (id <= '2000'::bigint)
+                    Buffers: shared hit=66
+              ->  Nested Loop  (cost=0.42..1.41 rows=1 width=8) (actual time=0.002..0.002 rows=0 loops=145)
+                    Buffers: shared hit=613
+                    ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt  (cost=0.29..1.23 rows=1 width=12) (actual time=0.001..0.001 rows=1 loops=145)
+                          Index Cond: (translation_key_id = translation_keys.id)
+                          Heap Fetches: 0
+                          Buffers: shared hit=291
+                    ->  Index Scan using tags_pkey on tags tg  (cost=0.13..0.15 rows=1 width=4) (actual time=0.001..0.001 rows=0 loops=161)
+                          Index Cond: (id = tkt.tag_id)
+                          Filter: ((name)::text = ANY ('{mobile}'::text[]))
+                          Rows Removed by Filter: 1
+                          Buffers: shared hit=322
+  SubPlan 1
+    ->  Aggregate  (cost=16.83..16.84 rows=1 width=32) (actual time=0.008..0.008 rows=1 loops=51)
+          Buffers: shared hit=265
+          ->  Sort  (cost=16.81..16.82 rows=4 width=38) (actual time=0.006..0.006 rows=4 loops=51)
+                Sort Key: l.code
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=265
+                ->  Nested Loop  (cost=0.42..16.77 rows=4 width=38) (actual time=0.002..0.004 rows=4 loops=51)
+                      Join Filter: (t.locale_id = l.id)
+                      Rows Removed by Join Filter: 6
+                      Buffers: shared hit=265
+                      ->  Index Scan using translations_key_locale_unique on translations t  (cost=0.42..15.51 rows=4 width=37) (actual time=0.002..0.003 rows=4 loops=51)
+                            Index Cond: (translation_key_id = page.id)
+                            Buffers: shared hit=264
+                      ->  Materialize  (cost=0.00..1.06 rows=4 width=5) (actual time=0.000..0.000 rows=2 loops=204)
+                            Buffers: shared hit=1
+                            ->  Seq Scan on locales l  (cost=0.00..1.04 rows=4 width=5) (actual time=0.008..0.008 rows=4 loops=1)
+                                  Buffers: shared hit=1
+  SubPlan 2
+    ->  Aggregate  (cost=9.44..9.45 rows=1 width=32) (actual time=0.006..0.006 rows=1 loops=51)
+          Buffers: shared hit=169
+          ->  Sort  (cost=9.43..9.44 rows=1 width=6) (actual time=0.005..0.005 rows=1 loops=51)
+                Sort Key: tg_1.name
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=169
+                ->  Nested Loop  (cost=0.29..9.42 rows=1 width=6) (actual time=0.003..0.004 rows=1 loops=51)
+                      Join Filter: (tkt_1.tag_id = tg_1.id)
+                      Rows Removed by Join Filter: 0
+                      Buffers: shared hit=169
+                      ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt_1  (cost=0.29..8.31 rows=1 width=4) (actual time=0.001..0.001 rows=1 loops=51)
+                            Index Cond: (translation_key_id = page.id)
+                            Heap Fetches: 0
+                            Buffers: shared hit=103
+                      ->  Seq Scan on tags tg_1  (cost=0.00..1.05 rows=5 width=10) (actual time=0.000..0.000 rows=1 loops=66)
+                            Buffers: shared hit=66
+Planning:
+  Buffers: shared hit=145
+Planning Time: 0.575 ms
+Execution Time: 1.178 ms
+
+=== search: tags all "web,mobile" [stmt 1/1] 4.000 ms — index only
+select "page".*, coalesce(( SELECT json_object_agg(l.code, t.value ORDER BY l.code) FROM translations t JOIN locales l ON l.id = t.locale_id WHERE t.translation_key_id = "page"."id" ), '{}'::json) as "values", coalesce(( SELECT json_agg(tg.name ORDER BY tg.name) FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "page"."id" ), '[]'::json) as "tags" from (select "id", "key", "description", "created_at", "updated_at" from "translation_keys" where translation_keys.id <= $1 and (EXISTS ( SELECT 1 FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "translation_keys"."id" AND tg.name = ANY($2::text[]) ) AND EXISTS ( SELECT 1 FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "translation_keys"."id" AND tg.name = ANY($3::text[]) )) order by "id" limit $4) as "page" order by "page"."id"
+Subquery Scan on page  (cost=1.14..3429.87 rows=51 width=154) (actual time=0.105..3.888 rows=51 loops=1)
+  Buffers: shared hit=5481
+  ->  Limit  (cost=1.14..2088.98 rows=51 width=90) (actual time=0.047..2.762 rows=51 loops=1)
+        Buffers: shared hit=5007
+        ->  Nested Loop Semi Join  (cost=1.14..4872.76 rows=119 width=90) (actual time=0.046..2.757 rows=51 loops=1)
+              Buffers: shared hit=5007
+              ->  Nested Loop Semi Join  (cost=0.71..4618.01 rows=492 width=98) (actual time=0.026..2.080 rows=298 loops=1)
+                    Buffers: shared hit=3686
+                    ->  Index Scan using translation_keys_pkey on translation_keys  (cost=0.29..1735.16 rows=2037 width=90) (actual time=0.009..0.303 rows=759 loops=1)
+                          Index Cond: (id <= '2000'::bigint)
+                          Buffers: shared hit=318
+                    ->  Nested Loop  (cost=0.42..1.41 rows=1 width=8) (actual time=0.002..0.002 rows=0 loops=759)
+                          Buffers: shared hit=3368
+                          ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt  (cost=0.29..1.23 rows=1 width=12) (actual time=0.001..0.001 rows=1 loops=759)
+                                Index Cond: (translation_key_id = translation_keys.id)
+                                Heap Fetches: 0
+                                Buffers: shared hit=1520
+                          ->  Index Scan using tags_pkey on tags tg  (cost=0.13..0.15 rows=1 width=4) (actual time=0.001..0.001 rows=0 loops=924)
+                                Index Cond: (id = tkt.tag_id)
+                                Filter: ((name)::text = ANY ('{web}'::text[]))
+                                Rows Removed by Filter: 1
+                                Buffers: shared hit=1848
+              ->  Nested Loop  (cost=0.42..0.51 rows=1 width=8) (actual time=0.002..0.002 rows=0 loops=298)
+                    Buffers: shared hit=1321
+                    ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt_1  (cost=0.29..0.34 rows=1 width=12) (actual time=0.001..0.001 rows=1 loops=298)
+                          Index Cond: (translation_key_id = tkt.translation_key_id)
+                          Heap Fetches: 0
+                          Buffers: shared hit=597
+                    ->  Index Scan using tags_pkey on tags tg_1  (cost=0.13..0.15 rows=1 width=4) (actual time=0.001..0.001 rows=0 loops=362)
+                          Index Cond: (id = tkt_1.tag_id)
+                          Filter: ((name)::text = ANY ('{mobile}'::text[]))
+                          Rows Removed by Filter: 1
+                          Buffers: shared hit=724
+  SubPlan 1
+    ->  Aggregate  (cost=16.83..16.84 rows=1 width=32) (actual time=0.011..0.011 rows=1 loops=51)
+          Buffers: shared hit=269
+          ->  Sort  (cost=16.81..16.82 rows=4 width=38) (actual time=0.008..0.008 rows=4 loops=51)
+                Sort Key: l.code
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=269
+                ->  Nested Loop  (cost=0.42..16.77 rows=4 width=38) (actual time=0.003..0.006 rows=4 loops=51)
+                      Join Filter: (t.locale_id = l.id)
+                      Rows Removed by Join Filter: 6
+                      Buffers: shared hit=269
+                      ->  Index Scan using translations_key_locale_unique on translations t  (cost=0.42..15.51 rows=4 width=37) (actual time=0.003..0.004 rows=4 loops=51)
+                            Index Cond: (translation_key_id = page.id)
+                            Buffers: shared hit=268
+                      ->  Materialize  (cost=0.00..1.06 rows=4 width=5) (actual time=0.000..0.000 rows=2 loops=204)
+                            Buffers: shared hit=1
+                            ->  Seq Scan on locales l  (cost=0.00..1.04 rows=4 width=5) (actual time=0.009..0.010 rows=4 loops=1)
+                                  Buffers: shared hit=1
+  SubPlan 2
+    ->  Aggregate  (cost=9.44..9.45 rows=1 width=32) (actual time=0.010..0.010 rows=1 loops=51)
+          Buffers: shared hit=205
+          ->  Sort  (cost=9.43..9.44 rows=1 width=6) (actual time=0.008..0.009 rows=2 loops=51)
+                Sort Key: tg_2.name
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=205
+                ->  Nested Loop  (cost=0.29..9.42 rows=1 width=6) (actual time=0.005..0.007 rows=2 loops=51)
+                      Join Filter: (tkt_2.tag_id = tg_2.id)
+                      Rows Removed by Join Filter: 2
+                      Buffers: shared hit=205
+                      ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt_2  (cost=0.29..8.31 rows=1 width=4) (actual time=0.001..0.001 rows=2 loops=51)
+                            Index Cond: (translation_key_id = page.id)
+                            Heap Fetches: 0
+                            Buffers: shared hit=103
+                      ->  Seq Scan on tags tg_2  (cost=0.00..1.05 rows=5 width=10) (actual time=0.000..0.000 rows=2 loops=102)
+                            Buffers: shared hit=102
+Planning:
+  Buffers: shared hit=508
+Planning Time: 0.810 ms
+Execution Time: 4.000 ms
+
+=== search: prefix + tags + content [stmt 1/2] 2.151 ms — index only
+select "page".*, coalesce(( SELECT json_object_agg(l.code, t.value ORDER BY l.code) FROM translations t JOIN locales l ON l.id = t.locale_id WHERE t.translation_key_id = "page"."id" ), '{}'::json) as "values", coalesce(( SELECT json_agg(tg.name ORDER BY tg.name) FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "page"."id" ), '[]'::json) as "tags" from (select "id", "key", "description", "created_at", "updated_at" from "translation_keys" where "key" like $1 and translation_keys.id <= $2 and EXISTS (SELECT 1 FROM translations t WHERE t.translation_key_id = translation_keys.id AND (t.search_vector @@ websearch_to_tsquery('simple', $3) OR t.value ILIKE $4)) and EXISTS ( SELECT 1 FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "translation_keys"."id" AND tg.name = ANY($5::text[]) ) order by "id" limit $6) as "page" order by "page"."id"
+Subquery Scan on page  (cost=1658.88..2368.83 rows=27 width=154) (actual time=1.553..2.005 rows=32 loops=1)
+  Buffers: shared hit=1679
+  ->  Limit  (cost=1658.88..1658.95 rows=27 width=90) (actual time=1.472..1.477 rows=32 loops=1)
+        Buffers: shared hit=1399
+        ->  Sort  (cost=1658.88..1658.95 rows=27 width=90) (actual time=1.471..1.474 rows=32 loops=1)
+              Sort Key: translation_keys.id
+              Sort Method: quicksort  Memory: 29kB
+              Buffers: shared hit=1399
+              ->  Nested Loop Semi Join  (cost=354.63..1658.24 rows=27 width=90) (actual time=0.596..1.460 rows=32 loops=1)
+                    Join Filter: (translation_keys.id = t.translation_key_id)
+                    Buffers: shared hit=1399
+                    ->  Nested Loop Semi Join  (cost=354.21..1614.03 rows=45 width=98) (actual time=0.577..1.103 rows=83 loops=1)
+                          Buffers: shared hit=1014
+                          ->  Bitmap Heap Scan on translation_keys  (cost=353.78..775.31 rows=185 width=90) (actual time=0.561..0.678 rows=200 loops=1)
+                                Recheck Cond: (id <= '2000'::bigint)
+                                Filter: ((key)::text ~~ 'checkout.%'::text)
+                                Heap Blocks: exact=70
+                                Buffers: shared hit=129
+                                ->  BitmapAnd  (cost=353.78..353.78 rows=163 width=0) (actual time=0.551..0.552 rows=0 loops=1)
+                                      Buffers: shared hit=59
+                                      ->  Bitmap Index Scan on translation_keys_pkey  (cost=0.00..51.57 rows=2037 width=0) (actual time=0.061..0.061 rows=2000 loops=1)
+                                            Index Cond: (id <= '2000'::bigint)
+                                            Buffers: shared hit=7
+                                      ->  Bitmap Index Scan on translation_keys_key_key  (cost=0.00..301.88 rows=4546 width=0) (actual time=0.481..0.481 rows=5000 loops=1)
+                                            Index Cond: (((key)::text >= 'checkout.'::text) AND ((key)::text < 'checkout/'::text))
+                                            Buffers: shared hit=52
+                          ->  Nested Loop  (cost=0.42..4.52 rows=1 width=8) (actual time=0.002..0.002 rows=0 loops=200)
+                                Buffers: shared hit=885
+                                ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt  (cost=0.29..4.35 rows=1 width=12) (actual time=0.001..0.001 rows=1 loops=200)
+                                      Index Cond: (translation_key_id = translation_keys.id)
+                                      Heap Fetches: 0
+                                      Buffers: shared hit=401
+                                ->  Index Scan using tags_pkey on tags tg  (cost=0.13..0.15 rows=1 width=4) (actual time=0.001..0.001 rows=0 loops=242)
+                                      Index Cond: (id = tkt.tag_id)
+                                      Filter: ((name)::text = ANY ('{web}'::text[]))
+                                      Rows Removed by Filter: 1
+                                      Buffers: shared hit=484
+                    ->  Index Scan using translations_key_locale_unique on translations t  (cost=0.42..0.97 rows=1 width=8) (actual time=0.004..0.004 rows=0 loops=83)
+                          Index Cond: (translation_key_id = tkt.translation_key_id)
+                          Filter: ((search_vector @@ '''pay'''::tsquery) OR (value ~~* '%pay%'::text))
+                          Rows Removed by Filter: 3
+                          Buffers: shared hit=385
+  SubPlan 1
+    ->  Aggregate  (cost=16.83..16.84 rows=1 width=32) (actual time=0.009..0.009 rows=1 loops=32)
+          Buffers: shared hit=170
+          ->  Sort  (cost=16.81..16.82 rows=4 width=38) (actual time=0.007..0.007 rows=4 loops=32)
+                Sort Key: l.code
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=170
+                ->  Nested Loop  (cost=0.42..16.77 rows=4 width=38) (actual time=0.003..0.006 rows=4 loops=32)
+                      Join Filter: (t_1.locale_id = l.id)
+                      Rows Removed by Join Filter: 6
+                      Buffers: shared hit=170
+                      ->  Index Scan using translations_key_locale_unique on translations t_1  (cost=0.42..15.51 rows=4 width=37) (actual time=0.002..0.003 rows=4 loops=32)
+                            Index Cond: (translation_key_id = page.id)
+                            Buffers: shared hit=169
+                      ->  Materialize  (cost=0.00..1.06 rows=4 width=5) (actual time=0.000..0.000 rows=2 loops=128)
+                            Buffers: shared hit=1
+                            ->  Seq Scan on locales l  (cost=0.00..1.04 rows=4 width=5) (actual time=0.015..0.015 rows=4 loops=1)
+                                  Buffers: shared hit=1
+  SubPlan 2
+    ->  Aggregate  (cost=9.44..9.45 rows=1 width=32) (actual time=0.006..0.006 rows=1 loops=32)
+          Buffers: shared hit=110
+          ->  Sort  (cost=9.43..9.44 rows=1 width=6) (actual time=0.005..0.005 rows=1 loops=32)
+                Sort Key: tg_1.name
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=110
+                ->  Nested Loop  (cost=0.29..9.42 rows=1 width=6) (actual time=0.004..0.005 rows=1 loops=32)
+                      Join Filter: (tkt_1.tag_id = tg_1.id)
+                      Rows Removed by Join Filter: 2
+                      Buffers: shared hit=110
+                      ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt_1  (cost=0.29..8.31 rows=1 width=4) (actual time=0.001..0.001 rows=1 loops=32)
+                            Index Cond: (translation_key_id = page.id)
+                            Heap Fetches: 0
+                            Buffers: shared hit=65
+                      ->  Seq Scan on tags tg_1  (cost=0.00..1.05 rows=5 width=10) (actual time=0.000..0.000 rows=3 loops=45)
+                            Buffers: shared hit=45
+Planning:
+  Buffers: shared hit=534
+Planning Time: 1.045 ms
+Execution Time: 2.151 ms
+
+=== search: prefix + tags + content [stmt 2/2] 29.996 ms — index only
+select "page".*, coalesce(( SELECT json_object_agg(l.code, t.value ORDER BY l.code) FROM translations t JOIN locales l ON l.id = t.locale_id WHERE t.translation_key_id = "page"."id" ), '{}'::json) as "values", coalesce(( SELECT json_agg(tg.name ORDER BY tg.name) FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "page"."id" ), '[]'::json) as "tags" from (select "id", "key", "description", "created_at", "updated_at" from "translation_keys" where "key" like $1 and translation_keys.id IN ( WITH hits AS MATERIALIZED ( SELECT DISTINCT t.translation_key_id FROM translations t JOIN translation_keys k ON k.id = t.translation_key_id AND k.key LIKE $2 WHERE (t.search_vector @@ websearch_to_tsquery('simple', $3) OR t.value ILIKE $4) AND "t"."translation_key_id" IN (SELECT tkt.translation_key_id FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tg.name = ANY($5::text[]) ) ) SELECT translation_key_id FROM hits ) order by "id" limit $6) as "page" order by "page"."id"
+Subquery Scan on page  (cost=5473.79..6814.81 rows=51 width=154) (actual time=28.735..29.494 rows=51 loops=1)
+  Buffers: shared hit=13086
+  ->  Limit  (cost=5473.79..5473.92 rows=51 width=90) (actual time=28.640..28.653 rows=51 loops=1)
+        Buffers: shared hit=12646
+        ->  Sort  (cost=5473.79..5473.97 rows=70 width=90) (actual time=28.639..28.648 rows=51 loops=1)
+              Sort Key: translation_keys.id
+              Sort Method: top-N heapsort  Memory: 36kB
+              Buffers: shared hit=12646
+              ->  Nested Loop  (cost=4142.16..5471.65 rows=70 width=90) (actual time=26.468..28.500 rows=777 loops=1)
+                    Buffers: shared hit=12646
+                    ->  HashAggregate  (cost=4141.87..4143.87 rows=200 width=8) (actual time=26.451..26.555 rows=777 loops=1)
+                          Group Key: hits.translation_key_id
+                          Batches: 1  Memory Usage: 89kB
+                          Buffers: shared hit=10315
+                          ->  CTE Scan on hits  (cost=4124.43..4139.93 rows=775 width=8) (actual time=26.012..26.261 rows=777 loops=1)
+                                Buffers: shared hit=10315
+                                CTE hits
+                                  ->  Unique  (cost=4120.56..4124.43 rows=775 width=8) (actual time=26.010..26.172 rows=777 loops=1)
+                                        Buffers: shared hit=10315
+                                        ->  Sort  (cost=4120.56..4122.50 rows=775 width=8) (actual time=26.008..26.045 rows=875 loops=1)
+                                              Sort Key: t_1.translation_key_id
+                                              Sort Method: quicksort  Memory: 25kB
+                                              Buffers: shared hit=10315
+                                              ->  Nested Loop  (cost=2647.42..4083.37 rows=775 width=8) (actual time=8.651..25.874 rows=875 loops=1)
+                                                    Join Filter: (t_1.translation_key_id = k.id)
+                                                    Buffers: shared hit=10315
+                                                    ->  Hash Join  (cost=2647.00..2857.19 rows=1248 width=16) (actual time=8.600..14.181 rows=2104 loops=1)
+                                                          Hash Cond: (tkt_1.translation_key_id = k.id)
+                                                          Buffers: shared hit=1009
+                                                          ->  HashAggregate  (cost=1294.43..1431.70 rows=13727 width=8) (actual time=6.101..9.013 rows=20431 loops=1)
+                                                                Group Key: tkt_1.translation_key_id
+                                                                Batches: 1  Memory Usage: 1809kB
+                                                                Buffers: shared hit=84
+                                                                ->  Nested Loop  (cost=0.42..1260.12 rows=13727 width=8) (actual time=0.046..2.584 rows=20431 loops=1)
+                                                                      Buffers: shared hit=84
+                                                                      ->  Seq Scan on tags tg_1  (cost=0.00..1.06 rows=1 width=4) (actual time=0.024..0.029 rows=1 loops=1)
+                                                                            Filter: ((name)::text = ANY ('{web}'::text[]))
+                                                                            Rows Removed by Filter: 4
+                                                                            Buffers: shared hit=1
+                                                                      ->  Index Only Scan using translation_key_tags_tag_key_idx on translation_key_tags tkt_1  (cost=0.42..1087.48 rows=17158 width=12) (actual time=0.019..1.552 rows=20431 loops=1)
+                                                                            Index Cond: (tag_id = tg_1.id)
+                                                                            Heap Fetches: 7
+                                                                            Buffers: shared hit=83
+                                                          ->  Hash  (cost=1287.99..1287.99 rows=5166 width=8) (actual time=2.436..2.436 rows=5000 loops=1)
+                                                                Buckets: 8192  Batches: 1  Memory Usage: 260kB
+                                                                Buffers: shared hit=925
+                                                                ->  Bitmap Heap Scan on translation_keys k  (cost=303.17..1287.99 rows=5166 width=8) (actual time=0.580..1.932 rows=5000 loops=1)
+                                                                      Filter: ((key)::text ~~ 'checkout.%'::text)
+                                                                      Heap Blocks: exact=873
+                                                                      Buffers: shared hit=925
+                                                                      ->  Bitmap Index Scan on translation_keys_key_key  (cost=0.00..301.88 rows=4546 width=0) (actual time=0.502..0.502 rows=5000 loops=1)
+                                                                            Index Cond: (((key)::text >= 'checkout.'::text) AND ((key)::text < 'checkout/'::text))
+                                                                            Buffers: shared hit=52
+                                                    ->  Index Scan using translations_key_locale_unique on translations t_1  (cost=0.42..0.97 rows=1 width=8) (actual time=0.005..0.005 rows=0 loops=2104)
+                                                          Index Cond: (translation_key_id = tkt_1.translation_key_id)
+                                                          Filter: ((search_vector @@ '''pay'''::tsquery) OR (value ~~* '%pay%'::text))
+                                                          Rows Removed by Filter: 4
+                                                          Buffers: shared hit=9306
+                    ->  Index Scan using translation_keys_pkey on translation_keys  (cost=0.29..6.71 rows=1 width=90) (actual time=0.002..0.002 rows=1 loops=777)
+                          Index Cond: (id = hits.translation_key_id)
+                          Filter: ((key)::text ~~ 'checkout.%'::text)
+                          Buffers: shared hit=2331
+  SubPlan 1
+    ->  Aggregate  (cost=16.83..16.84 rows=1 width=32) (actual time=0.009..0.009 rows=1 loops=51)
+          Buffers: shared hit=265
+          ->  Sort  (cost=16.81..16.82 rows=4 width=38) (actual time=0.007..0.007 rows=4 loops=51)
+                Sort Key: l.code
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=265
+                ->  Nested Loop  (cost=0.42..16.77 rows=4 width=38) (actual time=0.003..0.006 rows=4 loops=51)
+                      Join Filter: (t.locale_id = l.id)
+                      Rows Removed by Join Filter: 6
+                      Buffers: shared hit=265
+                      ->  Index Scan using translations_key_locale_unique on translations t  (cost=0.42..15.51 rows=4 width=37) (actual time=0.003..0.004 rows=4 loops=51)
+                            Index Cond: (translation_key_id = page.id)
+                            Buffers: shared hit=264
+                      ->  Materialize  (cost=0.00..1.06 rows=4 width=5) (actual time=0.000..0.000 rows=2 loops=204)
+                            Buffers: shared hit=1
+                            ->  Seq Scan on locales l  (cost=0.00..1.04 rows=4 width=5) (actual time=0.023..0.023 rows=4 loops=1)
+                                  Buffers: shared hit=1
+  SubPlan 2
+    ->  Aggregate  (cost=9.44..9.45 rows=1 width=32) (actual time=0.006..0.006 rows=1 loops=51)
+          Buffers: shared hit=175
+          ->  Sort  (cost=9.43..9.44 rows=1 width=6) (actual time=0.005..0.005 rows=1 loops=51)
+                Sort Key: tg.name
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=175
+                ->  Nested Loop  (cost=0.29..9.42 rows=1 width=6) (actual time=0.004..0.005 rows=1 loops=51)
+                      Join Filter: (tkt.tag_id = tg.id)
+                      Rows Removed by Join Filter: 2
+                      Buffers: shared hit=175
+                      ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt  (cost=0.29..8.31 rows=1 width=4) (actual time=0.001..0.001 rows=1 loops=51)
+                            Index Cond: (translation_key_id = page.id)
+                            Heap Fetches: 0
+                            Buffers: shared hit=103
+                      ->  Seq Scan on tags tg  (cost=0.00..1.05 rows=5 width=10) (actual time=0.000..0.000 rows=3 loops=72)
+                            Buffers: shared hit=72
+Planning:
+  Buffers: shared hit=539
+Planning Time: 1.145 ms
+Execution Time: 29.996 ms
+
+=== show: findById [stmt 1/1] 0.047 ms — index only
+select "id", "key", "description", "created_at", "updated_at", coalesce(( SELECT json_object_agg(l.code, t.value ORDER BY l.code) FROM translations t JOIN locales l ON l.id = t.locale_id WHERE t.translation_key_id = "translation_keys"."id" ), '{}'::json) as "values", coalesce(( SELECT json_agg(tg.name ORDER BY tg.name) FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tkt.translation_key_id = "translation_keys"."id" ), '[]'::json) as "tags" from "translation_keys" where "id" = $1
+Index Scan using translation_keys_pkey on translation_keys  (cost=0.29..34.60 rows=1 width=154) (actual time=0.006..0.007 rows=0 loops=1)
+  Index Cond: (id = '59634'::bigint)
+  Buffers: shared hit=2
+  SubPlan 1
+    ->  Aggregate  (cost=16.83..16.84 rows=1 width=32) (never executed)
+          ->  Sort  (cost=16.81..16.82 rows=4 width=38) (never executed)
+                Sort Key: l.code
+                ->  Nested Loop  (cost=0.42..16.77 rows=4 width=38) (never executed)
+                      Join Filter: (t.locale_id = l.id)
+                      ->  Index Scan using translations_key_locale_unique on translations t  (cost=0.42..15.51 rows=4 width=37) (never executed)
+                            Index Cond: (translation_key_id = translation_keys.id)
+                      ->  Materialize  (cost=0.00..1.06 rows=4 width=5) (never executed)
+                            ->  Seq Scan on locales l  (cost=0.00..1.04 rows=4 width=5) (never executed)
+  SubPlan 2
+    ->  Aggregate  (cost=9.44..9.45 rows=1 width=32) (never executed)
+          ->  Sort  (cost=9.43..9.44 rows=1 width=6) (never executed)
+                Sort Key: tg.name
+                ->  Nested Loop  (cost=0.29..9.42 rows=1 width=6) (never executed)
+                      Join Filter: (tkt.tag_id = tg.id)
+                      ->  Index Only Scan using translation_key_tags_pk on translation_key_tags tkt  (cost=0.29..8.31 rows=1 width=4) (never executed)
+                            Index Cond: (translation_key_id = translation_keys.id)
+                            Heap Fetches: 0
+                      ->  Seq Scan on tags tg  (cost=0.00..1.05 rows=5 width=10) (never executed)
+Planning:
+  Buffers: shared hit=8
+Planning Time: 0.268 ms
+Execution Time: 0.047 ms
+
+=== export: full locale (en) [stmt 1/1] 103.377 ms — indexed + expected full read of translation_keys
+select "tk"."key", "t"."value" from "translations" as "t" inner join "translation_keys" as "tk" on "tk"."id" = "t"."translation_key_id" where "t"."locale_id" = $1 order by "tk"."key"
+Sort  (cost=14363.38..14506.04 rows=57064 width=61) (actual time=92.964..100.921 rows=50001 loops=1)
+  Sort Key: tk.key COLLATE "C"
+  Sort Method: quicksort  Memory: 5836kB
+  Buffers: shared hit=5936
+  ->  Hash Join  (cost=3977.14..9855.24 rows=57064 width=61) (actual time=16.131..55.454 rows=50001 loops=1)
+        Hash Cond: (t.translation_key_id = tk.id)
+        Buffers: shared hit=5936
+        ->  Bitmap Heap Scan on translations t  (cost=1770.67..7498.97 rows=57064 width=43) (actual time=3.523..19.228 rows=50001 loops=1)
+              Recheck Cond: (locale_id = '1'::smallint)
+              Heap Blocks: exact=4751
+              Buffers: shared hit=5008
+              ->  Bitmap Index Scan on translations_locale_key_idx  (cost=0.00..1756.40 rows=57064 width=0) (actual time=3.030..3.031 rows=63487 loops=1)
+                    Index Cond: (locale_id = '1'::smallint)
+                    Buffers: shared hit=257
+        ->  Hash  (cost=1496.21..1496.21 rows=56821 width=34) (actual time=12.523..12.526 rows=50001 loops=1)
+              Buckets: 65536  Batches: 1  Memory Usage: 3929kB
+              Buffers: shared hit=928
+              ->  Seq Scan on translation_keys tk  (cost=0.00..1496.21 rows=56821 width=34) (actual time=0.009..4.455 rows=50001 loops=1)
+                    Buffers: shared hit=928
+Planning:
+  Buffers: shared hit=150
+Planning Time: 0.324 ms
+Execution Time: 103.377 ms
+
+=== export: locale filtered by tag "mobile" [stmt 1/1] 113.965 ms — indexed + expected full read of translation_keys
+select "tk"."key", "t"."value" from "translations" as "t" inner join "translation_keys" as "tk" on "tk"."id" = "t"."translation_key_id" where "t"."locale_id" = $1 and "tk"."id" IN (SELECT tkt.translation_key_id FROM translation_key_tags tkt JOIN tags tg ON tg.id = tkt.tag_id WHERE tg.name = ANY($2::text[]) ) order by "tk"."key"
+Sort  (cost=12228.26..12263.65 rows=14157 width=61) (actual time=109.522..112.080 rows=20719 loops=1)
+  Sort Key: tk.key COLLATE "C"
+  Sort Method: quicksort  Memory: 2551kB
+  Buffers: shared hit=6021
+  ->  Hash Join  (cost=5172.03..11252.18 rows=14157 width=61) (actual time=26.023..87.144 rows=20719 loops=1)
+        Hash Cond: (t.translation_key_id = tk.id)
+        Buffers: shared hit=6021
+        ->  Bitmap Heap Scan on translations t  (cost=1770.67..7498.97 rows=57064 width=43) (actual time=3.259..30.366 rows=50001 loops=1)
+              Recheck Cond: (locale_id = '1'::smallint)
+              Heap Blocks: exact=4751
+              Buffers: shared hit=5008
+              ->  Bitmap Index Scan on translations_locale_key_idx  (cost=0.00..1756.40 rows=57064 width=0) (actual time=2.773..2.774 rows=63487 loops=1)
+                    Index Cond: (locale_id = '1'::smallint)
+                    Buffers: shared hit=257
+        ->  Hash  (cost=3229.78..3229.78 rows=13727 width=42) (actual time=22.706..22.715 rows=20719 loops=1)
+              Buckets: 32768 (originally 16384)  Batches: 1 (originally 1)  Memory Usage: 1834kB
+              Buffers: shared hit=1013
+              ->  Hash Semi Join  (cost=1431.70..3229.78 rows=13727 width=42) (actual time=4.571..18.253 rows=20719 loops=1)
+                    Hash Cond: (tk.id = tkt.translation_key_id)
+                    Buffers: shared hit=1013
+                    ->  Seq Scan on translation_keys tk  (cost=0.00..1496.21 rows=56821 width=34) (actual time=0.033..2.995 rows=50001 loops=1)
+                          Buffers: shared hit=928
+                    ->  Hash  (cost=1260.12..1260.12 rows=13727 width=8) (actual time=4.510..4.516 rows=20719 loops=1)
+                          Buckets: 32768 (originally 16384)  Batches: 1 (originally 1)  Memory Usage: 1066kB
+                          Buffers: shared hit=85
+                          ->  Nested Loop  (cost=0.42..1260.12 rows=13727 width=8) (actual time=0.044..2.533 rows=20719 loops=1)
+                                Buffers: shared hit=85
+                                ->  Seq Scan on tags tg  (cost=0.00..1.06 rows=1 width=4) (actual time=0.015..0.020 rows=1 loops=1)
+                                      Filter: ((name)::text = ANY ('{mobile}'::text[]))
+                                      Rows Removed by Filter: 4
+                                      Buffers: shared hit=1
+                                ->  Index Only Scan using translation_key_tags_tag_key_idx on translation_key_tags tkt  (cost=0.42..1087.48 rows=17158 width=12) (actual time=0.026..1.526 rows=20719 loops=1)
+                                      Index Cond: (tag_id = tg.id)
+                                      Heap Fetches: 6
+                                      Buffers: shared hit=84
+Planning:
+  Buffers: shared hit=540
+Planning Time: 0.944 ms
+Execution Time: 113.965 ms
+
+=== auth: token lookup by hash [stmt 1/1] 0.021 ms — index only
+select "id", "user_id", "token_hash", "scopes", "expires_at", "revoked_at", "last_used_at" from "api_tokens" where "token_hash" = $1
+Seq Scan on api_tokens  (cost=0.00..2.65 rows=1 width=210) (actual time=0.013..0.013 rows=0 loops=1)
+  Filter: (token_hash = '0000000000000000000000000000000000000000000000000000000000000000'::bpchar)
+  Rows Removed by Filter: 36
+  Buffers: shared hit=2
+Planning Time: 0.056 ms
+Execution Time: 0.021 ms
+
+OK: 0 statement(s) with an unexpected seq scan, > 10000 rows removed by filter, or a search statement > 50 ms
